@@ -6,6 +6,8 @@ If you use this branch on a stock Robo3D ***YOU DO NOT HAVE THE HOTEND
 HEAT OVERPROTECTION***
 
 The MAXTEMP for the hotend has been CHANGED from 235 to 330
+
+Also this version of the driver is setup for the VIKI LCD
 ######################################################################
 
 ==========================
