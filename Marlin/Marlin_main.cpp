@@ -43,7 +43,6 @@
 #include "ConfigurationStore.h"
 #include "language.h"
 #include "pins_arduino.h"
-#include "math.h"
 
 #ifdef BLINKM
 #include "BlinkM.h"
@@ -140,7 +139,6 @@
 // M218 - set hotend offset (in mm): T<extruder_number> X<offset_on_X> Y<offset_on_Y>
 // M220 S<factor in percent>- set speed factor override percentage
 // M221 S<factor in percent>- set extrude factor override percentage
-// M226 P<pin number> S<pin state>- Wait until the specified pin reaches the state required
 // M240 - Trigger a camera to take a photograph
 // M250 - Set LCD contrast C<contrast value> (value 0..63)
 // M280 - set servo position absolute. P: servo index, S: angle or microseconds
@@ -192,7 +190,6 @@ float endstop_adj[3]={0,0,0};
 #endif
 float min_pos[3] = { X_MIN_POS, Y_MIN_POS, Z_MIN_POS };
 float max_pos[3] = { X_MAX_POS, Y_MAX_POS, Z_MAX_POS };
-bool axis_known_position[3] = {false, false, false};
 
 // Extruder offset
 #if EXTRUDERS > 1
@@ -951,11 +948,16 @@ static void homeaxis(int axis) {
     current_position[axis] = 0;
     plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
 	
-
     // Engage Servo endstop if enabled
     #ifdef SERVO_ENDSTOPS
       #if defined (ENABLE_AUTO_BED_LEVELING) && (PROBE_SERVO_DEACTIVATION_DELAY > 0)
         if (axis==Z_AXIS) {
+          #if defined (Z_RAISE_BEFORE_HOMING) && (Z_RAISE_BEFORE_HOMING > 0)
+            destination[axis] = Z_RAISE_BEFORE_HOMING * axis_home_dir * (-1);    // Set destination away from bed
+            feedrate = max_feedrate[axis];
+            plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
+            st_synchronize();
+          #endif
           engage_z_probe();
         }
 	    else
@@ -997,7 +999,6 @@ static void homeaxis(int axis) {
     destination[axis] = current_position[axis];
     feedrate = 0.0;
     endstops_hit_on_purpose();
-    axis_known_position[axis] = true;
 
     // Retract Servo endstop if enabled
     #ifdef SERVO_ENDSTOPS
@@ -1206,6 +1207,12 @@ void process_commands()
         HOMEAXIS(Y);
       }
 
+      #if Z_HOME_DIR < 0                      // If homing towards BED do Z last
+      if((home_all_axis) || (code_seen(axis_codes[Z_AXIS]))) {
+        HOMEAXIS(Z);
+      }
+      #endif
+
       if(code_seen(axis_codes[X_AXIS]))
       {
         if(code_value_long() != 0) {
@@ -1218,74 +1225,14 @@ void process_commands()
           current_position[Y_AXIS]=code_value()+add_homeing[1];
         }
       }
-      
-      #if Z_HOME_DIR < 0                      // If homing towards BED do Z last
-        #ifndef Z_SAFE_HOMING
-          if((home_all_axis) || (code_seen(axis_codes[Z_AXIS]))) {
-            #if defined (Z_RAISE_BEFORE_HOMING) && (Z_RAISE_BEFORE_HOMING > 0)
-              destination[Z_AXIS] = Z_RAISE_BEFORE_HOMING * home_dir(Z_AXIS) * (-1);    // Set destination away from bed
-              feedrate = max_feedrate[Z_AXIS];
-              plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
-              st_synchronize();
-            #endif
-            HOMEAXIS(Z);
-          }
-        #else                      // Z Safe mode activated. 
-          if(home_all_axis) {
-            destination[X_AXIS] = round(Z_SAFE_HOMING_X_POINT - X_PROBE_OFFSET_FROM_EXTRUDER);
-            destination[Y_AXIS] = round(Z_SAFE_HOMING_Y_POINT - Y_PROBE_OFFSET_FROM_EXTRUDER);
-            destination[Z_AXIS] = Z_RAISE_BEFORE_HOMING * home_dir(Z_AXIS) * (-1);    // Set destination away from bed
-            feedrate = XY_TRAVEL_SPEED;
-            current_position[Z_AXIS] = 0;
-			
-            plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
-            plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
-            st_synchronize();
-            current_position[X_AXIS] = destination[X_AXIS];
-            current_position[Y_AXIS] = destination[Y_AXIS];
 
-            HOMEAXIS(Z);
-          }
-                                                // Let's see if X and Y are homed and probe is inside bed area.
-          if(code_seen(axis_codes[Z_AXIS])) {
-            if ( (axis_known_position[X_AXIS]) && (axis_known_position[Y_AXIS]) \
-              && (current_position[X_AXIS]+X_PROBE_OFFSET_FROM_EXTRUDER >= X_MIN_POS) \
-              && (current_position[X_AXIS]+X_PROBE_OFFSET_FROM_EXTRUDER <= X_MAX_POS) \
-              && (current_position[Y_AXIS]+Y_PROBE_OFFSET_FROM_EXTRUDER >= Y_MIN_POS) \
-              && (current_position[Y_AXIS]+Y_PROBE_OFFSET_FROM_EXTRUDER <= Y_MAX_POS)) {
-
-              current_position[Z_AXIS] = 0;
-              plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);			  
-              destination[Z_AXIS] = Z_RAISE_BEFORE_HOMING * home_dir(Z_AXIS) * (-1);    // Set destination away from bed
-              feedrate = max_feedrate[Z_AXIS];
-              plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
-              st_synchronize();
-
-              HOMEAXIS(Z);
-            } else if (!((axis_known_position[X_AXIS]) && (axis_known_position[Y_AXIS]))) {
-                LCD_MESSAGEPGM(MSG_POSITION_UNKNOWN);
-                SERIAL_ECHO_START;
-                SERIAL_ECHOLNPGM(MSG_POSITION_UNKNOWN);
-            } else {
-                LCD_MESSAGEPGM(MSG_ZPROBE_OUT);
-                SERIAL_ECHO_START;
-                SERIAL_ECHOLNPGM(MSG_ZPROBE_OUT);
-            }
-          }
-        #endif
-      #endif
-
-      
-     
       if(code_seen(axis_codes[Z_AXIS])) {
         if(code_value_long() != 0) {
           current_position[Z_AXIS]=code_value()+add_homeing[2];
         }
       }
       #ifdef ENABLE_AUTO_BED_LEVELING
-        if((home_all_axis) || (code_seen(axis_codes[Z_AXIS]))) {
-          current_position[Z_AXIS] -= Z_PROBE_OFFSET_FROM_EXTRUDER;  //Add Z_Probe offset (the distance is negative)
-        }
+         current_position[Z_AXIS] -= Z_PROBE_OFFSET_FROM_EXTRUDER;  //Add Z_Probe offset (the distance is negative)
       #endif
       plan_set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
 #endif // else DELTA
@@ -1327,9 +1274,9 @@ void process_commands()
             do_blocking_move_to(LEFT_PROBE_BED_POSITION - X_PROBE_OFFSET_FROM_EXTRUDER, BACK_PROBE_BED_POSITION - Y_PROBE_OFFSET_FROM_EXTRUDER, current_position[Z_AXIS]);
 
             engage_z_probe();   // Engage Z Servo endstop if available
+            
             run_z_probe();
             float z_at_xLeft_yBack = current_position[Z_AXIS];
-            retract_z_probe();
 
             SERIAL_PROTOCOLPGM("Bed x: ");
             SERIAL_PROTOCOL(LEFT_PROBE_BED_POSITION);
@@ -1342,12 +1289,9 @@ void process_commands()
             // prob 2
             do_blocking_move_to(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS] + Z_RAISE_BETWEEN_PROBINGS);
             do_blocking_move_to(LEFT_PROBE_BED_POSITION - X_PROBE_OFFSET_FROM_EXTRUDER, FRONT_PROBE_BED_POSITION - Y_PROBE_OFFSET_FROM_EXTRUDER, current_position[Z_AXIS]);
-
-            engage_z_probe();   // Engage Z Servo endstop if available
             run_z_probe();
             float z_at_xLeft_yFront = current_position[Z_AXIS];
-            retract_z_probe();
-            
+
             SERIAL_PROTOCOLPGM("Bed x: ");
             SERIAL_PROTOCOL(LEFT_PROBE_BED_POSITION);
             SERIAL_PROTOCOLPGM(" y: ");
@@ -1360,12 +1304,9 @@ void process_commands()
             do_blocking_move_to(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS] + Z_RAISE_BETWEEN_PROBINGS);
             // the current position will be updated by the blocking move so the head will not lower on this next call.
             do_blocking_move_to(RIGHT_PROBE_BED_POSITION - X_PROBE_OFFSET_FROM_EXTRUDER, FRONT_PROBE_BED_POSITION - Y_PROBE_OFFSET_FROM_EXTRUDER, current_position[Z_AXIS]);
-
-            engage_z_probe();   // Engage Z Servo endstop if available
             run_z_probe();
             float z_at_xRight_yFront = current_position[Z_AXIS];
-            retract_z_probe(); // Retract Z Servo endstop if available
-            
+
             SERIAL_PROTOCOLPGM("Bed x: ");
             SERIAL_PROTOCOL(RIGHT_PROBE_BED_POSITION);
             SERIAL_PROTOCOLPGM(" y: ");
@@ -1378,6 +1319,8 @@ void process_commands()
 
             set_bed_level_equation(z_at_xLeft_yFront, z_at_xRight_yFront, z_at_xLeft_yBack);
 
+            retract_z_probe(); // Retract Z Servo endstop if available
+            
             st_synchronize();            
 
             // The following code correct the Z height difference from z-probe position and hotend tip position.
@@ -1882,15 +1825,6 @@ void process_commands()
       case 80: // M80 - Turn on Power Supply
         SET_OUTPUT(PS_ON_PIN); //GND
         WRITE(PS_ON_PIN, PS_ON_AWAKE);
-
-        // If you have a switch on suicide pin, this is useful
-        // if you want to start another print with suicide feature after
-        // a print without suicide...
-        #if defined SUICIDE_PIN && SUICIDE_PIN > -1
-            SET_OUTPUT(SUICIDE_PIN);
-            WRITE(SUICIDE_PIN, HIGH);
-        #endif
-        
         #ifdef ULTIPANEL
           powersupply = true;
           LCD_MESSAGEPGM(WELCOME_MSG);
@@ -2213,57 +2147,6 @@ void process_commands()
       }
     }
     break;
-	
-	case 226: // M226 P<pin number> S<pin state>- Wait until the specified pin reaches the state required
-	{
-      if(code_seen('P')){
-        int pin_number = code_value(); // pin number
-        int pin_state = -1; // required pin state - default is inverted
-        
-        if(code_seen('S')) pin_state = code_value(); // required pin state
-      
-        if(pin_state >= -1 && pin_state <= 1){
-        
-          for(int8_t i = 0; i < (int8_t)sizeof(sensitive_pins); i++)
-          {
-            if (sensitive_pins[i] == pin_number)
-            {
-              pin_number = -1;
-              break;
-            }
-          }
-        
-          if (pin_number > -1)
-          {
-            st_synchronize();
-            
-            pinMode(pin_number, INPUT);
-            
-            int target;
-            switch(pin_state){
-            case 1:
-              target = HIGH;
-              break;
-            
-            case 0:
-              target = LOW;
-              break;
-            
-            case -1:
-              target = !digitalRead(pin_number);
-              break;
-            }
-            
-            while(digitalRead(pin_number) != target){
-              manage_heater();
-              manage_inactivity();
-              lcd_update();
-            }
-          }
-        }
-      }
-    }
-    break;	
 
     #if NUM_SERVOS > 0
     case 280: // M280 - set servo position absolute. P: servo index, S: angle or microseconds
@@ -3065,7 +2948,7 @@ void controllerFan()
   {
     lastMotorCheck = millis();
 
-    if(!READ(X_ENABLE_PIN) || !READ(Y_ENABLE_PIN) || !READ(Z_ENABLE_PIN) || (soft_pwm_bed > 0)
+    if(!READ(X_ENABLE_PIN) || !READ(Y_ENABLE_PIN) || !READ(Z_ENABLE_PIN)
     #if EXTRUDERS > 2
        || !READ(E2_ENABLE_PIN)
     #endif
