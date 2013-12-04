@@ -4,6 +4,8 @@ MODIFIED to use the E3D ***ALL METAL*** HOTEND.
 
 If you use this branch on a stock Robo3D ***YOU DO NOT HAVE THE HOTEND
 HEAT OVERPROTECTION***
+
+The MAXTEMP for the hotend has been CHANGED from 235 to 330
 ######################################################################
 
 ==========================
