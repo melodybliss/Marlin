@@ -1,3 +1,20 @@
+=====================================================================
+Melody's Robo3D Configuration with E3D and RepRap Discount Controller
+=====================================================================
+######################################################################
+This configuration has modifications for the Robo3D with the E3D
+hotend and the RepRap Discount Controller
+
+Information for the RepRap Discount Controller can be found at
+http://reprap.org/wiki/RepRapDiscount_Smart_Controller
+
+and E3D Hotend can be found at
+(Manufacturer)   http://e3d-online.com/E3D-HotEnds
+(Distributor-US) http://www.filastruder.com/products/all-metal-e3d-hotend
+
+MAXTEMP for EXTRUDER 0 has been changed from 235 (original Robo3D hotend)
+to 330
+
 ==========================
 Marlin 3D Printer Firmware
 ==========================
