@@ -68,7 +68,7 @@
 #endif
 
 // Define this to set a custom name for your generic Mendel,
- #define CUSTOM_MENDEL_NAME "RoBo 3D"
+#define CUSTOM_MENDEL_NAME "RoBo 3D Melody-E3D-REPRAP_SC"
 
 // This defines the number of extruders
 #define EXTRUDERS 1
@@ -133,7 +133,7 @@
 // When temperature exceeds max temp, your heater will be switched off.
 // This feature exists to protect your hotend from overheating accidentally, but *NOT* from thermistor short/failure!
 // You should use MINTEMP for thermistor short/failure protection.
-#define HEATER_0_MAXTEMP 235
+#define HEATER_0_MAXTEMP 330
 #define HEATER_1_MAXTEMP 275
 #define HEATER_2_MAXTEMP 275
 #define BED_MAXTEMP 150
