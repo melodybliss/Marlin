@@ -358,8 +358,8 @@ const bool Z_MAX_ENDSTOP_INVERTING = false; // set to true to invert the logic o
 
 // default settings
 
-// Robo3D Default // #define DEFAULT_AXIS_STEPS_PER_UNIT   {80.69,80.69,2269.472,747.626}  // default steps per unit for Ultimaker
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {78.33,78.33,2203.370,747.626}  // Steps for Melody's Robo 3D
+#define DEFAULT_AXIS_STEPS_PER_UNIT   {80.69,80.69,2269.472,747.626}  // default steps for Robo 3D {X, Y, Z, E}
+// #define DEFAULT_AXIS_STEPS_PER_UNIT   {78.33,78.33,2203.370,747.626}  // Steps for Melody's Robo 3D
 #define DEFAULT_MAX_FEEDRATE          {500, 500, 5, 25}    // (mm/sec)
 #define DEFAULT_MAX_ACCELERATION      {9000,9000,100,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for skeinforge 40+, for older versions raise them a lot.
 
